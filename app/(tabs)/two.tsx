@@ -1,6 +1,7 @@
 import { Text } from "@/components/Themed";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Button, FlatList, StyleSheet, TextInput, View } from "react-native";
+import { Button, StyleSheet, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { createNote } from "../models/Note";
@@ -11,6 +12,8 @@ export default function TabTwoScreen() {
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+
+  const router = useRouter();
 
   const addNote = () => {
     const trimmedTitle = title.trim();
@@ -25,11 +28,13 @@ export default function TabTwoScreen() {
       type: "success",
       text1: "Successfully added note",
       position: "top",
-      visibilityTime: 2000,
+      visibilityTime: 3000,
     });
 
     setTitle("");
     setContent("");
+
+    router.back();
   };
 
   return (
@@ -47,12 +52,12 @@ export default function TabTwoScreen() {
         />
         <Text style={styles.subTitle}>Content</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, styles.contentInput]}
           placeholder="Content for your note ... "
           multiline
           editable
           numberOfLines={4}
-          maxLength={50}
+          maxLength={100}
           value={content}
           onChangeText={setContent}
         />
@@ -76,6 +81,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
+  contentInput: {
+  minHeight: 120,
+  textAlignVertical: "top",
+},
   inputContainer: {
     width: "100%",
     padding: 16,
