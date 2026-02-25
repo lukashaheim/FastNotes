@@ -1,7 +1,13 @@
 import { Text } from "@/components/Themed";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Button, StyleSheet, TextInput, View } from "react-native";
+import {
+  Button,
+  KeyboardAvoidingView,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { createNote } from "../models/Note";
@@ -39,30 +45,31 @@ export default function TabTwoScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Add new note</Text>
-      <View style={styles.inputContainer}>
-        <Text style={styles.subTitle}>Title</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Title for your note ... "
-          editable
-          maxLength={10}
-          value={title}
-          onChangeText={setTitle}
-        />
-        <Text style={styles.subTitle}>Content</Text>
-        <TextInput
-          style={[styles.input, styles.contentInput]}
-          placeholder="Content for your note ... "
-          multiline
-          editable
-          numberOfLines={4}
-          maxLength={100}
-          value={content}
-          onChangeText={setContent}
-        />
-        <Button title="Add" onPress={addNote} />
-      </View>
+      <KeyboardAvoidingView>
+        <View style={styles.inputContainer}>
+          <Text style={styles.subTitle}>Title</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Title for your note ... "
+            editable
+            maxLength={10}
+            value={title}
+            onChangeText={setTitle}
+          />
+          <Text style={styles.subTitle}>Content</Text>
+          <TextInput
+            style={[styles.input, styles.contentInput]}
+            placeholder="Content for your note ... "
+            multiline
+            editable
+            numberOfLines={4}
+            maxLength={100}
+            value={content}
+            onChangeText={setContent}
+          />
+          <Button title="Add" onPress={addNote} />
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -70,21 +77,21 @@ export default function TabTwoScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "stretch",
   },
   title: {
     fontSize: 20,
     fontWeight: "bold",
+    alignContent: "center"
   },
   subTitle: {
     fontSize: 16,
     fontWeight: "bold",
   },
   contentInput: {
-  minHeight: 120,
-  textAlignVertical: "top",
-},
+    minHeight: 120,
+    textAlignVertical: "top",
+  },
   inputContainer: {
     width: "100%",
     padding: 16,
