@@ -34,9 +34,20 @@ coverage/
 
 # editor
 .vscode/
+.idea/
 
 # typescript
 *.tsbuildinfo
 
 # expo types
 expo-env.d.ts
+
+# Flutter / Dart
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.metadata
+**/generated_plugin_registrant.*
+**/GeneratedPluginRegistrant.*
+**/*.iml
