@@ -29,7 +29,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Notes",
+          title: "Work notes",
           tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
           headerRight: () => (
             <Link href="/modal" asChild>
@@ -49,6 +49,20 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="two"
+        options={{
+          href: null,
+          title: "New note",
+        }}
+      />
+      <Tabs.Screen
+        name="notes/[id]"
+        options={{
+          href: null,
+          title: "New note",
+        }}
+      />
+      <Tabs.Screen
+        name="notes/edit/[id]"
         options={{
           href: null,
           title: "New note",

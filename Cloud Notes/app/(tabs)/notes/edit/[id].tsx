@@ -1,9 +1,10 @@
 import { Text, Text as ThemedText } from "@/components/Themed";
 import { useAuthContext } from "@/hooks/auth-context";
 import { supabase } from "@/lib/supabase";
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Pressable,
   StyleSheet,
@@ -12,62 +13,134 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
-import { useNotes } from "../NotesContext";
+import { useNotes } from "../../../NotesContext";
 
-export default function TabTwoScreen() {
+export default function updateNoteScreen() {
   const { profile } = useAuthContext();
   const { notes, setNotes } = useNotes();
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
 
+  const { id } = useLocalSearchParams<{ id: string }>();
+
   const router = useRouter();
 
-  const addNote = async () => {
+  useEffect(() => {
+    const fetchNote = async () => {
+      if (!id) return;
+
+      const { data, error } = await supabase
+        .from("FastNotes")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error || !data) return;
+
+      setTitle(data.title || "");
+      setContent(data.content || "");
+    };
+
+    fetchNote();
+  }, [id]);
+
+  const handleUpdateNote = async () => {
     const trimmedTitle = title.trim();
     const trimmedContent = content.trim();
 
-    if (!trimmedTitle || !trimmedContent || !profile?.id) return;
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    if (!trimmedTitle || !trimmedContent || !id) return;
 
     const { data, error } = await supabase
       .from("FastNotes")
-      .insert([
+      .update([
         {
           title: trimmedTitle,
           content: trimmedContent,
-          created_by: profile.id,
+          last_changed_by: profile?.id,
         },
       ])
+      .eq("id", id)
       .select()
       .single();
 
     if (error) {
       Toast.show({
         type: "error",
-        text1: "Could not save note",
+        text1: "Could not update note",
         text2: error.message,
         position: "top",
       });
       return;
     }
 
-    setNotes((prev) => [data, ...prev]);
+    setNotes((prev) => prev.map((note) => (note.id === data.id ? data : note)));
 
     Toast.show({
       type: "success",
-      text1: "Successfully added note",
+      text1: "Successfully updated note",
       position: "top",
       visibilityTime: 3000,
     });
 
-    setTitle("");
-    setContent("");
     router.back();
   };
+
+
+    const handleSoftDeleteNote = async () => {
+      if (!id) return;
+
+    const { data, error } = await supabase
+      .from("FastNotes")
+      .update([
+        {
+          deleted_at: new Date().toISOString(),
+          last_changed_by: profile?.id,
+        },
+      ])
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      Toast.show({
+        type: "error",
+        text1: "Could not delete note",
+        text2: error.message,
+        position: "top",
+      });
+      return;
+    }
+
+    setNotes((prev) => prev.map((note) => (note.id === data.id ? data : note)));
+
+    Toast.show({
+      type: "success",
+      text1: "Successfully deleted note",
+      position: "top",
+      visibilityTime: 3000,
+    });
+
+    router.back();
+  };
+
+  const confirmDeleteNote = () => {
+  Alert.alert(
+    "Delete note",
+    "Are you sure you want to delete this note?",
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: handleSoftDeleteNote,
+      },
+    ]
+  );
+};
 
   return (
     <SafeAreaView style={styles.container}>
@@ -93,8 +166,11 @@ export default function TabTwoScreen() {
             value={content}
             onChangeText={setContent}
           />
-          <Pressable style={styles.button} onPress={addNote}>
-            <ThemedText style={styles.buttonText}>Add</ThemedText>
+          <Pressable style={styles.button} onPress={handleUpdateNote}>
+            <ThemedText style={styles.buttonText}>Update note</ThemedText>
+          </Pressable>
+          <Pressable style={styles.deleteButton} onPress={confirmDeleteNote}>
+            <ThemedText style={styles.buttonText}>Delete note</ThemedText>
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -157,4 +233,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
   },
+  deleteButton: {
+  backgroundColor: "#e74c3c",
+  padding: 14,
+  borderRadius: 8,
+  alignItems: "center",
+},
 });

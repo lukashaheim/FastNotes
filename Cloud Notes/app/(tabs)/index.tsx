@@ -1,40 +1,69 @@
 import { FlatList, Pressable, StyleSheet } from "react-native";
-
 import { Text, View } from "@/components/Themed";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
+import { useCallback } from "react";
 import { useNotes } from "../NotesContext";
+import { supabase } from "@/lib/supabase";
 
 export default function TabOneScreen() {
-  const { notes } = useNotes();
+  const { notes, setNotes } = useNotes();
   const router = useRouter();
+
+  const fetchNotes = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setNotes([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("FastNotes")
+      .select("*")
+      .is("deleted_at", null)
+    if (error) {
+      console.log(error.message);
+      return;
+    }
+
+    setNotes(data ?? []);
+  }, [setNotes]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchNotes();
+    }, [fetchNotes])
+  );
 
   return (
     <View style={styles.container}>
       <FlatList
-  data={notes}
-  keyExtractor={(item) => item.id}
-  contentContainerStyle={styles.listContent}
-  renderItem={({ item }) => (
-    <Pressable
-      style={({ pressed }) => [
-        styles.card,
-        pressed && styles.cardPressed,
-      ]}
-      onPress={() =>
-        router.push({
-          pathname: "/notes/[id]",
-          params: { id: item.id },
-        })
-      }
-    >
-      <Text style={styles.cardTitle}>{item.title}</Text>
-      <Text style={styles.preview} numberOfLines={2}>
-        {item.content}
-      </Text>
-    </Pressable>
-  )}
-  ListEmptyComponent={<Text style={styles.empty}>No notes yet</Text>}
-/>
+        data={notes}
+        keyExtractor={(item) => String(item.id)}
+        contentContainerStyle={styles.listContent}
+        renderItem={({ item }) => (
+          <Pressable
+            style={({ pressed }) => [
+              styles.card,
+              pressed && styles.cardPressed,
+            ]}
+            onPress={() =>
+              router.push({
+                pathname: "/notes/[id]",
+                params: { id: String(item.id) },
+              })
+            }
+          >
+            <Text style={styles.cardTitle}>{item.title}</Text>
+            <Text style={styles.preview} numberOfLines={2}>
+              {item.content}
+            </Text>
+          </Pressable>
+        )}
+        ListEmptyComponent={<Text style={styles.empty}>No notes yet</Text>}
+      />
 
       <View style={styles.bottomBar}>
         <Pressable
@@ -56,7 +85,7 @@ const styles = StyleSheet.create({
 
   listContent: {
     gap: 12,
-    paddingBottom: 90, // plass til knappen
+    paddingBottom: 90,
   },
 
   card: {
@@ -91,9 +120,3 @@ const styles = StyleSheet.create({
   newNoteButtonPressed: { opacity: 0.8 },
   newNoteText: { color: "white", fontSize: 16, fontWeight: "bold" },
 });
-
-
-
-
-
-
