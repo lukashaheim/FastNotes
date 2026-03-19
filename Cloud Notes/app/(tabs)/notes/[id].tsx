@@ -1,8 +1,9 @@
 import { Text } from "@/components/Themed";
 import { supabase } from "@/lib/supabase";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import React, { useCallback, useState } from "react";
 
 type Note = {
   id: string;
@@ -18,29 +19,33 @@ export default function NoteDetail() {
   const [note, setNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchNote = async () => {
-      if (!id) return;
+  const fetchNote = useCallback(async () => {
+    if (!id) return;
 
-      const { data, error } = await supabase
-        .from("FastNotes")
-        .select("*")
-        .eq("id", id)
-        .single();
+    setLoading(true);
 
-      if (error) {
-        console.log(error.message);
-        setNote(null);
-        setLoading(false);
-        return;
-      }
+    const { data, error } = await supabase
+      .from("FastNotes")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-      setNote(data);
+    if (error) {
+      console.log(error.message);
+      setNote(null);
       setLoading(false);
-    };
+      return;
+    }
 
-    fetchNote();
+    setNote(data);
+    setLoading(false);
   }, [id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchNote();
+    }, [fetchNote])
+  );
 
   if (loading) {
     return <Text>Loading...</Text>;

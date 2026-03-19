@@ -78,7 +78,7 @@ export default function TabTwoScreen() {
             style={styles.input}
             placeholder="Title for your note ... "
             editable
-            maxLength={10}
+            maxLength={20}
             value={title}
             onChangeText={setTitle}
           />

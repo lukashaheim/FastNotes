@@ -65,7 +65,7 @@ export default function TabLayout() {
         name="notes/edit/[id]"
         options={{
           href: null,
-          title: "New note",
+          title: "Edit note",
         }}
       />
     </Tabs>
