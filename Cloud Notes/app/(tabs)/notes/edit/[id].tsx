@@ -86,9 +86,8 @@ export default function updateNoteScreen() {
     router.back();
   };
 
-
-    const handleSoftDeleteNote = async () => {
-      if (!id) return;
+  const handleSoftDeleteNote = async () => {
+    if (!id) return;
 
     const { data, error } = await supabase
       .from("FastNotes")
@@ -124,11 +123,40 @@ export default function updateNoteScreen() {
     router.back();
   };
 
+  const handleHardDeleteNote = async () => {
+    if (!id) return;
+
+    const { data, error } = await supabase
+      .from("FastNotes")
+      .delete()
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      Toast.show({
+        type: "error",
+        text1: "Could not delete note",
+        text2: error.message,
+        position: "top",
+      });
+      return;
+    }
+
+    setNotes((prev) => prev.map((note) => (note.id === data.id ? data : note)));
+
+    Toast.show({
+      type: "success",
+      text1: "Successfully deleted note",
+      position: "top",
+      visibilityTime: 3000,
+    });
+
+    router.back();
+  };
+
   const confirmDeleteNote = () => {
-  Alert.alert(
-    "Delete note",
-    "Are you sure you want to delete this note?",
-    [
+    Alert.alert("Delete note", "Are you sure you want to delete this note?", [
       {
         text: "Cancel",
         style: "cancel",
@@ -136,11 +164,10 @@ export default function updateNoteScreen() {
       {
         text: "Delete",
         style: "destructive",
-        onPress: handleSoftDeleteNote,
+        onPress: handleHardDeleteNote,
       },
-    ]
-  );
-};
+    ]);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -234,9 +261,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   deleteButton: {
-  backgroundColor: "#e74c3c",
-  padding: 14,
-  borderRadius: 8,
-  alignItems: "center",
-},
+    backgroundColor: "#e74c3c",
+    padding: 14,
+    borderRadius: 8,
+    alignItems: "center",
+  },
 });

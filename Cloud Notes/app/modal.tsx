@@ -1,26 +1,30 @@
+import { Text } from "@/components/Themed";
 import { StatusBar } from "expo-status-bar";
 import { Platform, StyleSheet } from "react-native";
 
 import { View } from "@/components/Themed";
 import SignOutButton from "@/components/social-auth-buttons/sign-out-button";
+import { useAuthContext } from "@/hooks/auth-context";
 import { Stack } from "expo-router";
 
 export default function ModalScreen() {
+  const { profile } = useAuthContext();
   return (
     <>
-    <Stack.Screen options={{ title: "Profile" }} />
+      <Stack.Screen options={{ title: "Profile" }} />
 
-    <View style={styles.container}>
-      <View
-        style={styles.separator}
-        lightColor="#eee"
-        darkColor="rgba(255,255,255,0.1)"
-      />
-      <SignOutButton />
+      <View style={styles.container}>
+        <Text style={styles.title}>Logged in as {profile?.email}</Text>
+        <View
+          style={styles.separator}
+          lightColor="#eee"
+          darkColor="rgba(255,255,255,0.1)"
+        />
+        <SignOutButton />
 
-      {/* Use a light status bar on iOS to account for the black space above the modal */}
-      <StatusBar style={Platform.OS === "ios" ? "light" : "auto"} />
-    </View>
+        {/* Use a light status bar on iOS to account for the black space above the modal */}
+        <StatusBar style={Platform.OS === "ios" ? "light" : "auto"} />
+      </View>
     </>
   );
 }
