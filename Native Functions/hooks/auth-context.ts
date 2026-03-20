@@ -1,15 +1,24 @@
+import { supabase } from '@/lib/supabase';
 import { createContext, useContext, useState } from 'react'
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
-  const login = () => {
-    setIsLoggedIn(true)
-  }
+  const login = async (email: string, password: string) => {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
 
-  const logout = () => {
-    setIsLoggedIn(false)
-  }
+  if (error) throw error;
+
+  setIsLoggedIn(true);
+};
+
+  const logout = async () => {
+  await supabase.auth.signOut();
+  setIsLoggedIn(false);
+};
 }
 
 export type AuthData = {

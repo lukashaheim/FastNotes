@@ -29,8 +29,6 @@ SplashScreen.preventAutoHideAsync();
 function RootNavigator() {
   const { isLoggedIn } = useAuthContext();
 
-  console.log('isLoggedIn:', isLoggedIn)
-
   return (
     <Stack>
       <Stack.Protected guard={isLoggedIn}>
