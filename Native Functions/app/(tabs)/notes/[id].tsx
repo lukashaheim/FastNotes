@@ -1,43 +1,78 @@
 import { Text } from "@/components/Themed";
 import { supabase } from "@/lib/supabase";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
 
 type Note = {
-  id: string;
+  id: number;
   title: string;
   content: string;
   created_at?: string;
   created_by?: string;
+  last_changed_by?: string;
+  image_path?: string | null;
 };
 
 export default function NoteDetail() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+
   const [note, setNote] = useState<Note | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [imageLoading, setImageLoading] = useState(false);
 
   const fetchNote = useCallback(async () => {
-    if (!id) return;
+    if (!id) {
+      setNote(null);
+      setImageUrl(null);
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
+    setImageUrl(null);
+    setImageLoading(false);
 
     const { data, error } = await supabase
       .from("FastNotes")
       .select("*")
-      .eq("id", id)
+      .eq("id", Number(id))
       .single();
 
-    if (error) {
-      console.log(error.message);
+    if (error || !data) {
+      console.log("Fetch note error:", error?.message);
       setNote(null);
+      setImageUrl(null);
       setLoading(false);
       return;
     }
 
     setNote(data);
+
+    const cleanImagePath =
+      typeof data.image_path === "string" ? data.image_path.trim() : "";
+
+    if (!cleanImagePath) {
+      setImageUrl(null);
+      setLoading(false);
+      return;
+    }
+
+    const { data: signedData, error: signedError } = await supabase.storage
+      .from("notes")
+      .createSignedUrl(cleanImagePath, 3600);
+
+    if (signedError || !signedData?.signedUrl) {
+      console.log("Signed URL error:", signedError?.message);
+      setImageUrl(null);
+      setLoading(false);
+      return;
+    }
+
+    setImageUrl(signedData.signedUrl);
     setLoading(false);
   }, [id]);
 
@@ -58,24 +93,47 @@ export default function NoteDetail() {
   return (
     <>
       <Stack.Screen options={{ title: note.title || "Note" }} />
-      <View style={styles.container}>
-        <Text style={styles.title}>{note.title}</Text>
-        <Text style={styles.content}>{note.content}</Text>
-      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.container}>
+          <Text style={styles.title}>{note.title}</Text>
+          <Text style={styles.content}>{note.content}</Text>
+
+          {imageUrl ? (
+            <>
+              {imageLoading && <Text>Loading image...</Text>}
+              <Image
+                source={{ uri: imageUrl }}
+                style={styles.previewImage}
+                onLoadStart={() => setImageLoading(true)}
+                onLoadEnd={() => setImageLoading(false)}
+                onError={(e) => {
+                  console.log("Image load error:", e.nativeEvent.error);
+                  setImageLoading(false);
+                  setImageUrl(null);
+                }}
+              />
+            </>
+          ) : (
+            <Text>No image available</Text>
+          )}
+        </View>
+      </ScrollView>
+
       <View style={styles.bottomBar}>
         <Pressable
           style={({ pressed }) => [
-            styles.newNoteButton,
-            pressed && styles.newNoteButtonPressed,
+            styles.editButton,
+            pressed && styles.editButtonPressed,
           ]}
           onPress={() =>
-              router.push({
-                pathname: "/notes/edit/[id]",
-                params: { id: String(note.id) },
-              })
-            }
+            router.push({
+              pathname: "/notes/edit/[id]",
+              params: { id: String(note.id) },
+            })
+          }
         >
-          <Text style={styles.newNoteText}>Edit note</Text>
+          <Text style={styles.editButtonText}>Edit note</Text>
         </Pressable>
       </View>
     </>
@@ -83,6 +141,9 @@ export default function NoteDetail() {
 }
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    paddingBottom: 100,
+  },
   container: {
     flex: 1,
     padding: 16,
@@ -95,6 +156,14 @@ const styles = StyleSheet.create({
   content: {
     fontSize: 16,
     lineHeight: 22,
+    marginBottom: 16,
+  },
+  previewImage: {
+    width: "100%",
+    height: 250,
+    borderRadius: 8,
+    resizeMode: "cover",
+    marginTop: 12,
   },
   bottomBar: {
     position: "absolute",
@@ -102,7 +171,7 @@ const styles = StyleSheet.create({
     right: 16,
     bottom: 16,
   },
-  newNoteButton: {
+  editButton: {
     backgroundColor: "#2ecc71",
     paddingVertical: 16,
     borderRadius: 12,
@@ -110,6 +179,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     elevation: 3,
   },
-  newNoteButtonPressed: { opacity: 0.8 },
-  newNoteText: { color: "white", fontSize: 16, fontWeight: "bold" },
+  editButtonPressed: {
+    opacity: 0.8,
+  },
+  editButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
 });

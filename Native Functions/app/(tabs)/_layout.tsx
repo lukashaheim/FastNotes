@@ -68,6 +68,13 @@ export default function TabLayout() {
           title: "Edit note",
         }}
       />
+      <Tabs.Screen
+        name="notes/camera"
+        options={{
+          href: null,
+          title: "camera",
+        }}
+      />
     </Tabs>
   );
 }

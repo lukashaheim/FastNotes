@@ -1,10 +1,11 @@
 import { Text, Text as ThemedText } from "@/components/Themed";
 import { useAuthContext } from "@/hooks/auth-context";
 import { supabase } from "@/lib/supabase";
-import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   Keyboard,
   KeyboardAvoidingView,
@@ -20,7 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 import { useNotes } from "../NotesContext";
 
-type PendingAction = "camera" | "library" | null;
+type PendingIosAction = "library" | null;
 
 export default function TabTwoScreen() {
   const { profile } = useAuthContext();
@@ -34,7 +35,9 @@ export default function TabTwoScreen() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [imageMenuVisible, setImageMenuVisible] = useState(false);
-  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [pendingIosAction, setPendingIosAction] =
+    useState<PendingIosAction>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (photoUri) {
@@ -44,7 +47,8 @@ export default function TabTwoScreen() {
 
   const openLibrary = async () => {
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permission.granted) {
         Toast.show({
@@ -75,91 +79,184 @@ export default function TabTwoScreen() {
     }
   };
 
+  const openAndroidCamera = async () => {
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+      if (!permission.granted) {
+        Toast.show({
+          type: "error",
+          text1: "Permission denied",
+          text2: "You need to allow access to your camera",
+          position: "top",
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setLocalPhotoUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Could not open camera",
+        text2: error instanceof Error ? error.message : "Unknown error",
+        position: "top",
+      });
+    }
+  };
+
   const handleModalDismiss = async () => {
-    if (pendingAction === "camera") {
-      setPendingAction(null);
+    if (Platform.OS === "ios" && pendingIosAction === "library") {
+      setPendingIosAction(null);
+      await openLibrary();
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    if (Platform.OS === "ios") {
+      setImageMenuVisible(false);
       router.push("/notes/camera");
       return;
     }
 
-    if (pendingAction === "library") {
-      setPendingAction(null);
-      await openLibrary();
+    setImageMenuVisible(false);
+
+    setTimeout(async () => {
+      await openAndroidCamera();
+    }, 200);
+  };
+
+  const handleChooseFromLibrary = async () => {
+    if (Platform.OS === "ios") {
+      setPendingIosAction("library");
+      setImageMenuVisible(false);
+      return;
     }
+
+    setImageMenuVisible(false);
+
+    setTimeout(async () => {
+      await openLibrary();
+    }, 200);
   };
 
   const addNote = async () => {
     const trimmedTitle = title.trim();
     const trimmedContent = content.trim();
 
-    if (!trimmedTitle || !trimmedContent || !profile?.id) return;
+    if (!trimmedTitle || !trimmedContent || !profile?.id || isSaving) return;
 
-    const { data: noteData, error: noteError } = await supabase
-      .from("FastNotes")
-      .insert([
-        {
-          title: trimmedTitle,
-          content: trimmedContent,
-          created_by: profile.id,
-        },
-      ])
-      .select()
-      .single();
+    setIsSaving(true);
 
-    if (noteError) {
-      Toast.show({
-        type: "error",
-        text1: "Could not save note",
-        text2: noteError.message,
-        position: "top",
-      });
-      return;
-    }
+    try {
+      const { data: noteData, error: noteError } = await supabase
+        .from("FastNotes")
+        .insert([
+          {
+            title: trimmedTitle,
+            content: trimmedContent,
+            created_by: profile.id,
+          },
+        ])
+        .select()
+        .single();
 
-    if (localPhotoUri) {
-      const arrayBuffer = await fetch(localPhotoUri).then((res) =>
-        res.arrayBuffer(),
-      );
-
-      const fileName = `photo-${Date.now()}.jpg`;
-      const filePath = `${profile.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("notes")
-        .upload(filePath, arrayBuffer, {
-          contentType: "image/jpg",
-        });
-
-      if (uploadError) {
+      if (noteError) {
         Toast.show({
           type: "error",
-          text1: "Note saved, but image upload failed",
-          text2: uploadError.message,
+          text1: "Could not save note",
+          text2: noteError.message,
           position: "top",
         });
-
-        setNotes((prev) => [noteData, ...prev]);
-        setTitle("");
-        setContent("");
-        setLocalPhotoUri(undefined);
-        router.back();
         return;
       }
+
+      let finalNote = noteData;
+
+      if (localPhotoUri) {
+        const arrayBuffer = await fetch(localPhotoUri).then((res) =>
+          res.arrayBuffer(),
+        );
+
+        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+        const filePath = `${profile.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("notes")
+          .upload(filePath, arrayBuffer, {
+            contentType: "image/jpg",
+          });
+
+        if (uploadError) {
+          Toast.show({
+            type: "error",
+            text1: "Note saved, but image upload failed",
+            text2: uploadError.message,
+            position: "top",
+          });
+
+          setNotes((prev) => [noteData, ...prev]);
+          setTitle("");
+          setContent("");
+          setLocalPhotoUri(undefined);
+          return;
+        }
+
+        const { data: updatedNote, error: updateError } = await supabase
+          .from("FastNotes")
+          .update({ image_path: filePath })
+          .eq("id", noteData.id)
+          .select()
+          .single();
+
+        if (updateError) {
+          Toast.show({
+            type: "error",
+            text1: "Image uploaded, but note update failed",
+            text2: updateError.message,
+            position: "top",
+          });
+
+          setNotes((prev) => [noteData, ...prev]);
+          setTitle("");
+          setContent("");
+          setLocalPhotoUri(undefined);
+          return;
+        }
+
+        finalNote = updatedNote;
+      }
+
+      setNotes((prev) => [finalNote, ...prev]);
+
+      Toast.show({
+        type: "success",
+        text1: "Successfully added note",
+        position: "top",
+        visibilityTime: 3000,
+      });
+
+      setTitle("");
+      setContent("");
+      setLocalPhotoUri(undefined);
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Something went wrong",
+        text2: error instanceof Error ? error.message : "Unknown error",
+        position: "top",
+      });
+    } finally {
+      setIsSaving(false);
+      router.replace("/");
     }
-
-    setNotes((prev) => [noteData, ...prev]);
-
-    Toast.show({
-      type: "success",
-      text1: "Successfully added note",
-      position: "top",
-      visibilityTime: 3000,
-    });
-
-    setTitle("");
-    setContent("");
-    setLocalPhotoUri(undefined);
-    router.back();
   };
 
   return (
@@ -174,7 +271,7 @@ export default function TabTwoScreen() {
             <TextInput
               style={styles.input}
               placeholder="Title for your note ..."
-              editable
+              editable={!isSaving}
               maxLength={20}
               value={title}
               onChangeText={setTitle}
@@ -186,7 +283,7 @@ export default function TabTwoScreen() {
               style={[styles.input, styles.contentInput]}
               placeholder="Content for your note ..."
               multiline
-              editable
+              editable={!isSaving}
               numberOfLines={4}
               maxLength={100}
               value={content}
@@ -203,14 +300,23 @@ export default function TabTwoScreen() {
 
             <View style={styles.bottomButtons}>
               <Pressable
-                style={styles.button}
+                style={[styles.button, isSaving && styles.buttonDisabled]}
                 onPress={() => setImageMenuVisible(true)}
+                disabled={isSaving}
               >
                 <ThemedText style={styles.buttonText}>Image</ThemedText>
               </Pressable>
 
-              <Pressable style={styles.button} onPress={addNote}>
-                <ThemedText style={styles.buttonText}>Add</ThemedText>
+              <Pressable
+                style={[styles.button, isSaving && styles.buttonDisabled]}
+                onPress={addNote}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <ThemedText style={styles.buttonText}>Add</ThemedText>
+                )}
               </Pressable>
             </View>
           </View>
@@ -222,7 +328,7 @@ export default function TabTwoScreen() {
         transparent
         animationType="fade"
         onRequestClose={() => {
-          setPendingAction(null);
+          setPendingIosAction(null);
           setImageMenuVisible(false);
         }}
         onDismiss={handleModalDismiss}
@@ -230,27 +336,18 @@ export default function TabTwoScreen() {
         <Pressable
           style={styles.modalOverlay}
           onPress={() => {
-            setPendingAction(null);
+            setPendingIosAction(null);
             setImageMenuVisible(false);
           }}
         >
           <Pressable style={styles.modalContent} onPress={() => {}}>
-            <Pressable
-              style={styles.modalButton}
-              onPress={() => {
-                setPendingAction("camera");
-                setImageMenuVisible(false);
-              }}
-            >
+            <Pressable style={styles.modalButton} onPress={handleTakePhoto}>
               <Text style={styles.modalButtonText}>Take photo</Text>
             </Pressable>
 
             <Pressable
               style={styles.modalButton}
-              onPress={() => {
-                setPendingAction("library");
-                setImageMenuVisible(false);
-              }}
+              onPress={handleChooseFromLibrary}
             >
               <Text style={styles.modalButtonText}>Choose from library</Text>
             </Pressable>
@@ -258,7 +355,7 @@ export default function TabTwoScreen() {
             <Pressable
               style={[styles.modalButton, styles.removeButton]}
               onPress={() => {
-                setPendingAction(null);
+                setPendingIosAction(null);
                 setLocalPhotoUri(undefined);
                 setImageMenuVisible(false);
               }}
@@ -269,7 +366,7 @@ export default function TabTwoScreen() {
             <Pressable
               style={[styles.modalButton, styles.cancelButton]}
               onPress={() => {
-                setPendingAction(null);
+                setPendingIosAction(null);
                 setImageMenuVisible(false);
               }}
             >
@@ -325,6 +422,9 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 8,
     alignItems: "center",
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   buttonText: {
     color: "#fff",

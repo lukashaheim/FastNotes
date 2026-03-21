@@ -1,5 +1,6 @@
 import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { useRef, useState } from "react";
 import {
   Button,
@@ -14,11 +15,13 @@ export default function CameraScreen() {
   const [facing, setFacing] = useState<CameraType>("back");
   const [permission, requestPermission] = useCameraPermissions();
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [isTakingPhoto, setIsTakingPhoto] = useState(false);
   const cameraRef = useRef<CameraView | null>(null);
   const router = useRouter();
+  const isFocused = useIsFocused();
 
   if (!permission) {
-    return <View />;
+    return <View style={styles.container} />;
   }
 
   if (!permission.granted) {
@@ -33,13 +36,18 @@ export default function CameraScreen() {
   }
 
   async function takePicture() {
-    if (!cameraRef.current) return;
+    if (!cameraRef.current || isTakingPhoto || !isFocused) return;
 
-    const photo = await cameraRef.current.takePictureAsync();
+    try {
+      setIsTakingPhoto(true);
+      const photo = await cameraRef.current.takePictureAsync();
 
-    if (!photo?.uri) return;
+      if (!photo?.uri) return;
 
-    setPhotoUri(photo.uri);
+      setPhotoUri(photo.uri);
+    } finally {
+      setIsTakingPhoto(false);
+    }
   }
 
   function usePhoto() {
@@ -49,7 +57,7 @@ export default function CameraScreen() {
       pathname: "../two",
       params: { photoUri },
     });
-    setPhotoUri(null)
+    setPhotoUri(null);
   }
 
   function toggleCameraFacing() {
@@ -76,16 +84,31 @@ export default function CameraScreen() {
     </View>
   ) : (
     <View style={{ flex: 1 }}>
-      <CameraView ref={cameraRef} style={styles.camera} facing={facing} />
+      <CameraView
+        ref={cameraRef}
+        style={styles.camera}
+        facing={facing}
+        active={isFocused}
+      />
+
       <View style={styles.topBar} />
 
-      <TouchableOpacity style={styles.topLeft} onPress={() => router.push("/two")}>
+      <TouchableOpacity
+        style={styles.topLeft}
+        onPress={() => router.replace("../two")}
+      >
         <Text style={styles.icon}>✕</Text>
       </TouchableOpacity>
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.button} onPress={takePicture}>
-          <Text style={styles.text}>Take photo</Text>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={takePicture}
+          disabled={isTakingPhoto}
+        >
+          <Text style={styles.text}>
+            {isTakingPhoto ? "Taking..." : "Take photo"}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
